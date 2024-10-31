@@ -2,13 +2,16 @@ package ru.yandex.practicum.filmorate.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.ObjectNotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.storage.FriendStorage;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -17,69 +20,64 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UserServiceImpl implements UserService {
 	private final UserStorage userStorage;
+	private final FriendStorage friendStorage;
 
 	@Autowired
-	public UserServiceImpl(UserStorage userStorage) {
+	public UserServiceImpl(@Qualifier("userDbStorage") UserStorage userStorage, FriendStorage friendStorage) {
 		this.userStorage = userStorage;
+		this.friendStorage = friendStorage;
 	}
 
 	@Override
 	public List<User> addFriend(int userId, int friendId) {
-		User user = get(userId);
-		User friend = get(friendId);
-		Set<Integer> userFriends = user.getFriends();
-		if (userFriends.add(friendId)) {
-			log.info("К пользователю id:{}, добавлен друг id:{}", userId, friendId);
-		}
-		if (friend.getFriends().add(userId)) {
-			log.info("К пользователю id:{}, добавлен друг id:{}", friendId, userId);
-		}
-		return userFriends.stream()
-				.map(this::get)
-				.collect(Collectors.toList());
+		checkUser(userId);
+		checkUser(friendId);
+		int receivedUserId = friendStorage.addFriend(userId, friendId);
+		log.info("К пользователю id:{}, добавлен друг id:{}", receivedUserId, friendId);
+		return getFriends(userId);
 	}
 
 	@Override
 	public List<User> removeFriend(int userId, int friendId) {
-		User user = get(userId);
-		User friend = get(friendId);
-		Set<Integer> userFriends = user.getFriends();
-		Set<Integer> friendFriends = friend.getFriends();
-		userFriends.remove(friendId);
+		checkUser(userId);
+		checkUser(friendId);
+		if (!friendStorage.removeFriend(userId, friendId)) {
+			log.info("У пользователя id:{} не было в друзьях id:{}", userId, friendId);
+		}
 		log.info("У пользователя id:{}, удален друг id:{}", userId, friendId);
-		friendFriends.remove(userId);
-		log.info("У пользователя id:{}, удален друг id:{}", friendId, userId);
-		return userFriends.stream()
-				.map(this::get)
-				.collect(Collectors.toList());
+		return getFriends(userId);
 	}
 
 	@Override
 	public List<User> getFriends(int userId) {
-		User user = get(userId);
+		checkUser(userId);
+		Set<Integer> friends = friendStorage.getFriends(userId);
+		if (friends.isEmpty()) {
+			log.info("У пользователя id:{} нет друзей", userId);
+			return Collections.emptyList();
+		}
 		log.info("У пользователя id:{} получен список друзей", userId);
-		return user.getFriends().stream()
-				.map(this::get)
+		return friends.stream()
+				.map(userStorage::get)
 				.collect(Collectors.toList());
 	}
 
 	@Override
 	public List<User> getCommonFriends(int userId, int otherId) {
-		User user = get(userId);
-		User otherUser = get(otherId);
-		Set<Integer> friends = user.getFriends();
-		Set<Integer> otherFriends = otherUser.getFriends();
-		log.info("У пользователя id:{} получен общий список друзей с пользователем с id:{}", userId, otherId);
-		return friends.stream()
+		List<User> friends = getFriends(userId);
+		List<User> otherFriends = getFriends(otherId);
+		List<User> commonFriends = friends.stream()
 				.filter(otherFriends::contains)
-				.map(this::get)
 				.collect(Collectors.toList());
+		log.info("У пользователей id:{} и id:{} общих друзей:{}", userId, otherId, commonFriends.size());
+		return commonFriends;
 	}
 
 	@Override
 	public List<User> findAll() {
-		log.info("Количество найденых пользователей {}", userStorage.findAll().size());
-		return userStorage.findAll();
+		List<User> users = userStorage.findAll();
+		log.info("Количество найденых пользователей {}", users.size());
+		return users;
 	}
 
 	@Override
@@ -100,7 +98,8 @@ public class UserServiceImpl implements UserService {
 	@Override
 	public User update(User user) {
 		int userId = user.getId();
-		if (userId == 0 || userStorage.get(userId) == null) {
+		checkUser(userId);
+		if (userId == 0) {
 			throw new ObjectNotFoundException("Введите пользователя, которого надо обновить");
 		}
 		User userUpdated = userStorage.update(user);
@@ -110,10 +109,16 @@ public class UserServiceImpl implements UserService {
 
 	@Override
 	public User get(int id) {
-		if (userStorage.get(id) == null) {
+		User user = checkUser(id);
+		log.info("Получен пользователь с id: {}", id);
+		return user;
+	}
+
+	private User checkUser(int id) {
+		User user = userStorage.get(id);
+		if (user == null) {
 			throw new ObjectNotFoundException(String.format("Пользователь с id=%s не найден", id));
 		}
-		log.info("Получен пользователь с id: {}", id);
-		return userStorage.get(id);
+		return user;
 	}
 }

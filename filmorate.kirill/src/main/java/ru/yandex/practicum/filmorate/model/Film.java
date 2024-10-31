@@ -5,12 +5,13 @@ import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.List;
 
 @Data
+@NoArgsConstructor
 public class Film {
 	private int id;
 	@NotBlank(message = "Название не может быть пустым")
@@ -21,14 +22,17 @@ public class Film {
 	private LocalDate releaseDate;
 	@Positive(message = "Продолжительность фильма должна быть положительной")
 	private int duration;
-	private final Set<Integer> likesByUser;
+	private Mpa mpa;
+	private List<Genre> genres;
 
-	public Film(int id, String name, String description, LocalDate releaseDate, int duration) {
+	public Film(int id, String name, String description, LocalDate releaseDate,
+				int duration, Mpa mpa, List<Genre> genres) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
 		this.releaseDate = releaseDate;
 		this.duration = duration;
-		likesByUser = new HashSet<>();
+		this.mpa = mpa;
+		this.genres = genres;
 	}
 }
