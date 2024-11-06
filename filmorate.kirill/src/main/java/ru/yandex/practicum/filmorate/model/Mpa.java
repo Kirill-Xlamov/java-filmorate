@@ -1,4 +1,4 @@
 package ru.yandex.practicum.filmorate.model;
 
-public record ErrorResponse(String error) {
+public record Mpa(int id, String name) {
 }
