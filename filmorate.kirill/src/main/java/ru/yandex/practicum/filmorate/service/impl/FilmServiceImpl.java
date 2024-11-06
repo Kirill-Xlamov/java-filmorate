@@ -7,14 +7,12 @@ import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.ObjectNotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.model.Genre;
-import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.service.FilmService;
+import ru.yandex.practicum.filmorate.service.GenreService;
+import ru.yandex.practicum.filmorate.service.MpaService;
 import ru.yandex.practicum.filmorate.service.UserService;
 import ru.yandex.practicum.filmorate.storage.FilmStorage;
-import ru.yandex.practicum.filmorate.storage.GenreStorage;
 import ru.yandex.practicum.filmorate.storage.LikeStorage;
-import ru.yandex.practicum.filmorate.storage.MpaStorage;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -26,18 +24,18 @@ public class FilmServiceImpl implements FilmService {
 	private static final LocalDate MIN_RELEASE_DATE = LocalDate.of(1895, 12, 28);
 	private final FilmStorage filmStorage;
 	private final UserService userService;
-	private final GenreStorage genreStorage;
+	private final GenreService genreService;
 	private final LikeStorage likeStorage;
-	private final MpaStorage mpaStorage;
+	private final MpaService mpaService;
 
 	@Autowired
 	public FilmServiceImpl(@Qualifier("filmDbStorage") FilmStorage filmStorage, UserService userService,
-						   GenreStorage genreStorage, LikeStorage likeStorage, MpaStorage mpaStorage) {
+						   LikeStorage likeStorage, MpaService mpaService, GenreService genreService) {
 		this.filmStorage = filmStorage;
 		this.userService = userService;
-		this.genreStorage = genreStorage;
+		this.genreService = genreService;
 		this.likeStorage = likeStorage;
-		this.mpaStorage = mpaStorage;
+		this.mpaService = mpaService;
 	}
 
 	@Override
@@ -91,26 +89,10 @@ public class FilmServiceImpl implements FilmService {
 		if (film.getId() != 0) {
 			throw new ValidationException("При добавлении id должен быть 0");
 		}
-		Mpa mpaWithoutName = film.getMpa();
-		int mpaId = mpaWithoutName.getId();
-		List<Genre> genresWithoutName = film.getGenres();
-
-		Mpa mpaByIdWithName = checkMpaById(mpaId);
+		mpaService.checkMpa(film);
 		Film filmAdded = filmStorage.add(film);
-		filmAdded.setMpa(mpaByIdWithName);
-		if (genresWithoutName == null) {
-			log.info("Добавлен новый фильм без жанров {}", filmAdded.getName());
-			return filmAdded;
-		}
-		int filmId = filmAdded.getId();
-		List<Genre> genreWithName = genresWithoutName.stream()
-				.map(Genre::getId)
-				.distinct()
-				.map(this::checkGenreById)
-				.peek(genre -> genreStorage.addFilmGenre(filmId, genre.getId()))
-				.toList();
-		filmAdded.setGenres(genreWithName);
-		log.info("Добавлен новый фильм {}", filmAdded.getName());
+		filmAdded = mpaService.setMpaInFilm(filmAdded);
+		filmAdded = genreService.recordFilmGenre(filmAdded);
 		return filmAdded;
 	}
 
@@ -120,116 +102,20 @@ public class FilmServiceImpl implements FilmService {
 		if (filmId == 0) {
 			throw new ObjectNotFoundException("Введите фильм, который надо обновить");
 		}
-		Mpa mpaWithoutName = newFilm.getMpa();
-		Mpa mpaWithName = checkMpaById(mpaWithoutName.getId());
-		newFilm.setMpa(mpaWithName);
-		Film oldFilm = get(filmId);
+		mpaService.checkMpa(newFilm);
 		Film filmUpdated = filmStorage.update(newFilm);
-		updateGenreInFilm(newFilm, oldFilm);
+		filmUpdated = mpaService.setMpaInFilm(filmUpdated);
+		Film oldFilm = get(filmId);
+		genreService.updateGenreInFilm(newFilm, oldFilm);
 		log.info("Фильм обновлен: {}", newFilm);
 		return filmUpdated;
-	}
-
-	private void updateGenreInFilm(Film newFilm, Film filmOld) {
-		int filmId = newFilm.getId();
-		List<Genre> genresOld = filmOld.getGenres();
-		List<Genre> genresNew = newFilm.getGenres();
-
-		if (genresOld == null && genresNew != null) {
-			genresNew.stream()
-					.map(Genre::getId)
-					.forEach(genreId -> genreStorage.addFilmGenre(filmId, genreId));
-			return;
-		}
-		if (genresNew == null) {
-			return;
-		}
-		List<Integer> genresOldInt = genresOld.stream()
-				.map(Genre::getId)
-				.toList();
-		List<Integer> genresNewInt = genresNew.stream()
-				.map(Genre::getId)
-				.toList();
-		List<Integer> forDel = genresOld.stream()
-				.map(Genre::getId)
-				.collect(Collectors.toList());
-		List<Integer> duplicated = genresOld.stream()
-				.map(Genre::getId)
-				.collect(Collectors.toList());
-		List<Integer> forUpd = genresNew.stream()
-				.map(Genre::getId)
-				.collect(Collectors.toList());
-
-		duplicated.retainAll(genresOldInt);
-		forDel.removeAll(genresNewInt);
-		forUpd.removeAll(duplicated);
-		forDel.forEach(genreId -> genreStorage.deleteFilmGenre(filmId, genreId));
-		forUpd.forEach(genreId -> genreStorage.addFilmGenre(filmId, genreId));
 	}
 
 	@Override
 	public List<Film> findAll() {
 		List<Film> filmStorageAll = filmStorage.findAll();
-		filmStorageAll.forEach(this::setGenreById);
+		filmStorageAll.forEach(genreService::setGenreById);
 		log.info("Количество найденных фильмов {}", filmStorageAll.size());
 		return filmStorageAll;
-	}
-
-	private void setGenreById(Film film) {
-		int id = film.getId();
-		List<Genre> filmGenreById = genreStorage.getFilmGenreById(id);
-		film.setGenres(filmGenreById);
-	}
-
-	@Override
-	public List<Genre> getGenres() {
-		List<Genre> genres = genreStorage.getGenres();
-		log.info("Всего жанров: {}", genres.size());
-		return genres;
-	}
-
-	@Override
-	public Genre getGenreById(int genreId) {
-		Genre genreById = genreStorage.getGenreById(genreId);
-		if (genreById == null) {
-			throw new ObjectNotFoundException(String.format("Жанр c id: %s не найден", genreId));
-		}
-		log.info("Получен жанр: {}", genreById.getName());
-		return genreById;
-	}
-
-	@Override
-	public List<Mpa> getMpa() {
-		List<Mpa> mpa = mpaStorage.getMpa();
-		log.info("Всего рейтингов: {}", mpa.size());
-		return mpa;
-	}
-
-	@Override
-	public Mpa getMpaById(int mpaId) {
-		Mpa mpaById = mpaStorage.getMpaById(mpaId);
-		if (mpaById == null) {
-			throw new ObjectNotFoundException(String.format("Рейтинг c id: %s не найден", mpaId));
-		}
-		log.info("Получен рейтинг: {}", mpaById.getName());
-		return mpaById;
-	}
-
-	private Genre checkGenreById(int genreId) {
-		Genre genreById = genreStorage.getGenreById(genreId);
-		if (genreById == null) {
-			throw new ValidationException(String.format("Жанр c id: %s не найден", genreId));
-		}
-		log.info("Проверен жанр: {}", genreById.getName());
-		return genreById;
-	}
-
-	private Mpa checkMpaById(int mpaId) {
-		Mpa mpaById = mpaStorage.getMpaById(mpaId);
-		if (mpaById == null) {
-			throw new ValidationException(String.format("Рейтинг c id: %s не найден", mpaId));
-		}
-		log.info("Проверен рейтинг: {}", mpaById.getName());
-		return mpaById;
 	}
 }

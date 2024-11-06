@@ -20,6 +20,15 @@ import java.util.Objects;
 
 @Repository("filmDbStorage")
 public class FilmDbStorage implements FilmStorage {
+	private static final String SQL_QUERY_ADD = """ 
+			insert into public.films (name, description, releaseDate, duration, mpa_id) values (?, ?, ?, ?, ?)""";
+	private static final String SQL_QUERY_UPDATE = """
+			update public.films set name = ?, description = ?, releaseDate = ?, duration = ?, mpa_id = ? where film_id = ?""";
+	private static final String SQL_QUERY_FIND_ALL = "select * from films";
+	private static final String SQL_QUERY_GET = """
+			select * \n
+			from films \n
+			where film_id = ?""";
 	private final JdbcTemplate jdbcTemplate;
 	private final MpaStorage mpaStorage;
 	private final GenreStorage genreStorage;
@@ -32,17 +41,14 @@ public class FilmDbStorage implements FilmStorage {
 
 	@Override
 	public Film add(Film film) {
-		String sqlQuery = "insert into public.films (name, description, releaseDate, " +
-				"duration, mpa_id) values (?, ?, ?, ?, ?)";
-
 		KeyHolder keyHolder = new GeneratedKeyHolder();
 		jdbcTemplate.update(connection -> {
-			PreparedStatement stmt = connection.prepareStatement(sqlQuery, new String[]{"film_id"});
+			PreparedStatement stmt = connection.prepareStatement(SQL_QUERY_ADD, new String[]{"film_id"});
 			stmt.setString(1, film.getName());
 			stmt.setString(2, film.getDescription());
 			stmt.setDate(3, Date.valueOf(film.getReleaseDate()));
 			stmt.setInt(4, film.getDuration());
-			stmt.setInt(5, film.getMpa().getId());
+			stmt.setInt(5, film.getMpa().id());
 			return stmt;
 		}, keyHolder);
 
@@ -53,23 +59,19 @@ public class FilmDbStorage implements FilmStorage {
 
 	@Override
 	public Film update(Film film) {
-		String sqlQueryFilm = "update public.films set " +
-				"name = ?, description = ?, releaseDate = ?, duration = ?, mpa_id = ? " +
-				"where film_id = ?";
-		jdbcTemplate.update(sqlQueryFilm,
+		jdbcTemplate.update(SQL_QUERY_UPDATE,
 				film.getName(),
 				film.getDescription(),
 				film.getReleaseDate(),
 				film.getDuration(),
-				film.getMpa().getId(),
+				film.getMpa().id(),
 				film.getId());
 		return film;
 	}
 
 	@Override
 	public List<Film> findAll() {
-		String sql = "select * from films";
-		List<Film> users = jdbcTemplate.query(sql, (rs, rowNum) -> makeFilm(rs));
+		List<Film> users = jdbcTemplate.query(SQL_QUERY_FIND_ALL, (rs, rowNum) -> makeFilm(rs));
 		if (users.isEmpty()) {
 			return Collections.emptyList();
 		}
@@ -78,9 +80,7 @@ public class FilmDbStorage implements FilmStorage {
 
 	@Override
 	public Film get(int id) {
-		SqlRowSet filmRows = jdbcTemplate.queryForRowSet("select * " +
-				"from films " +
-				"where film_id = ?", id);
+		SqlRowSet filmRows = jdbcTemplate.queryForRowSet(SQL_QUERY_GET, id);
 		if (!filmRows.next()) {
 			return null;
 		}
@@ -97,6 +97,7 @@ public class FilmDbStorage implements FilmStorage {
 	private Film makeFilm(ResultSet rs) throws SQLException {
 		return new Film(rs.getInt("film_id"), rs.getString("name"),
 				rs.getString("description"), rs.getDate("releaseDate").toLocalDate(),
-				rs.getInt("duration"), mpaStorage.getMpaById(rs.getInt("mpa_id")), genreStorage.getFilmGenreById(rs.getInt("film_id")));
+				rs.getInt("duration"), mpaStorage.getMpaById(rs.getInt("mpa_id")),
+				genreStorage.getFilmGenreById(rs.getInt("film_id")));
 	}
 }

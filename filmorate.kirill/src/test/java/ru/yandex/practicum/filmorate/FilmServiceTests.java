@@ -14,6 +14,7 @@ import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
 import ru.yandex.practicum.filmorate.service.impl.FilmServiceImpl;
+import ru.yandex.practicum.filmorate.service.impl.GenreServiceImpl;
 import ru.yandex.practicum.filmorate.service.impl.UserServiceImpl;
 import ru.yandex.practicum.filmorate.storage.impl.*;
 
@@ -27,7 +28,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 @AutoConfigureTestDatabase
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 @Import({FilmServiceImpl.class, FilmDbStorage.class, UserServiceImpl.class, GenreDbStorage.class,
-		UserDbStorage.class, FriendsDbStorage.class, LikeDbStorage.class, MpaDbStorage.class})
+		UserDbStorage.class, FriendsDbStorage.class, LikeDbStorage.class, MpaDbStorage.class, GenreServiceImpl.class})
 class FilmServiceTests {
 	private final FilmService filmService;
 	private final UserService userService;
@@ -56,7 +57,7 @@ class FilmServiceTests {
 	public void testUpdate() {
 		Film newFilm = new Film(0, "newFilmName", "newDescript",
 				LocalDate.of(2021, 3, 15), 140, new Mpa(1, null),
-				Arrays.asList(new Genre(1, null), new Genre(2, null)));
+				Arrays.asList(new Genre(1, null), new Genre(3, null)));
 
 		filmService.add(film);
 		newFilm.setId(film.getId());
@@ -131,35 +132,5 @@ class FilmServiceTests {
 		assertThat(popularFilms.size()).isEqualTo(3);
 		assertThat(popularFilms.get(0)).isEqualTo(film2);
 		assertThat(popularFilms.get(1)).isEqualTo(film1);
-	}
-
-	@DisplayName("Проверка получения списка жанров")
-	@Test
-	public void testGetGenres() {
-		List<Genre> genres = filmService.getGenres();
-		assertThat(genres.size()).isEqualTo(6);
-		assertThat(genres.get(0)).isEqualTo(new Genre(1, "Comedy"));
-	}
-
-	@DisplayName("Проверка получения жанра по id")
-	@Test
-	public void testGetGenreById() {
-		Genre genreById = filmService.getGenreById(3);
-		assertThat(genreById).isEqualTo(new Genre(3, "Cartoon"));
-	}
-
-	@DisplayName("Проверка получения списка рейтингов")
-	@Test
-	public void testGetMpa() {
-		List<Mpa> mpa = filmService.getMpa();
-		assertThat(mpa.size()).isEqualTo(5);
-		assertThat(mpa.get(0)).isEqualTo(new Mpa(1, "G"));
-	}
-
-	@DisplayName("Проверка получения рейтинга по id")
-	@Test
-	public void testGetMpaById() {
-		Mpa mpaById = filmService.getMpaById(3);
-		assertThat(mpaById).isEqualTo(new Mpa(3, "PG-13"));
 	}
 }

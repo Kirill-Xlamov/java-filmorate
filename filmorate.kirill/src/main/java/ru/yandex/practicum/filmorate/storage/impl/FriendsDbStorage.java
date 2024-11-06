@@ -11,6 +11,9 @@ import java.util.Set;
 
 @Repository("friendDbStorage")
 public class FriendsDbStorage implements FriendStorage {
+	private static final String SQL_QUERY_ADD = "insert into friends(from_id, to_id, confirmation) values (?, ?, ?)";
+	private static final String SQL_QUERY_DELETE = "delete from friends where from_id = ? and to_id = ?";
+	private static final String SQL_QUERY_GET = "select * from friends where from_id = ?";
 	private final JdbcTemplate jdbcTemplate;
 
 	public FriendsDbStorage(JdbcTemplate jdbcTemplate) {
@@ -19,10 +22,8 @@ public class FriendsDbStorage implements FriendStorage {
 
 	@Override
 	public int addFriend(int userId, int friendId) {
-		String sqlQuery = "insert into friends(from_id, to_id, confirmation) " +
-				"values (?, ?, ?)";
 		boolean isFriend = getFriends(friendId).contains(userId);
-		jdbcTemplate.update(sqlQuery,
+		jdbcTemplate.update(SQL_QUERY_ADD,
 				userId,
 				friendId,
 				isFriend);
@@ -31,16 +32,14 @@ public class FriendsDbStorage implements FriendStorage {
 
 	@Override
 	public boolean removeFriend(int userId, int friendId) {
-		String sqlQuery = "delete from friends where from_id = ? and to_id = ?";
-		return jdbcTemplate.update(sqlQuery,
+		return jdbcTemplate.update(SQL_QUERY_DELETE,
 				userId,
 				friendId) > 0;
 	}
 
 	@Override
 	public Set<Integer> getFriends(int userId) {
-		String sql = "select * from friends where from_id = ?";
-		List<Integer> userFriends = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getInt("to_id"), userId);
+		List<Integer> userFriends = jdbcTemplate.query(SQL_QUERY_GET, (rs, rowNum) -> rs.getInt("to_id"), userId);
 		if (userFriends.isEmpty()) {
 			return Collections.emptySet();
 		}

@@ -76,7 +76,7 @@ public class UserServiceImpl implements UserService {
 	@Override
 	public List<User> findAll() {
 		List<User> users = userStorage.findAll();
-		log.info("Количество найденых пользователей {}", users.size());
+		log.info("Количество найденных пользователей {}", users.size());
 		return users;
 	}
 

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -12,6 +13,7 @@ import java.util.List;
 
 @Data
 @NoArgsConstructor
+@AllArgsConstructor
 public class Film {
 	private int id;
 	@NotBlank(message = "Название не может быть пустым")
@@ -24,15 +26,4 @@ public class Film {
 	private int duration;
 	private Mpa mpa;
 	private List<Genre> genres;
-
-	public Film(int id, String name, String description, LocalDate releaseDate,
-				int duration, Mpa mpa, List<Genre> genres) {
-		this.id = id;
-		this.name = name;
-		this.description = description;
-		this.releaseDate = releaseDate;
-		this.duration = duration;
-		this.mpa = mpa;
-		this.genres = genres;
-	}
 }

@@ -9,6 +9,13 @@ import java.util.List;
 
 @Repository
 public class LikeDbStorage implements LikeStorage {
+	private static final String SQL_QUERY_ADD = "insert into user_liked_film(user_id, film_id) values (?, ?)";
+	private static final String SQL_QUERY_GET = """
+			select film_id \n
+			from user_liked_film \n
+			group by film_id \n
+			order by count(user_id) desc \n
+			limit ?""";
 	private final JdbcTemplate jdbcTemplate;
 
 	public LikeDbStorage(JdbcTemplate jdbcTemplate) {
@@ -26,20 +33,14 @@ public class LikeDbStorage implements LikeStorage {
 
 	@Override
 	public boolean removeLike(int userId, int filmId) {
-		String sqlQuery = "delete from user_liked_film where user_id = ? and film_id = ?";
-		return jdbcTemplate.update(sqlQuery,
+		return jdbcTemplate.update(SQL_QUERY_ADD,
 				userId,
 				filmId) > 0;
 	}
 
 	@Override
 	public List<Integer> getPopularFilms(int count) {
-		String sql = "select film_id " +
-				"from user_liked_film " +
-				"group by film_id " +
-				"order by count(user_id) desc " +
-				"limit ?";
-		List<Integer> popularFilms = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getInt("film_id"), count);
+		List<Integer> popularFilms = jdbcTemplate.query(SQL_QUERY_GET, (rs, rowNum) -> rs.getInt("film_id"), count);
 		if (popularFilms.isEmpty()) {
 			return Collections.emptyList();
 		}

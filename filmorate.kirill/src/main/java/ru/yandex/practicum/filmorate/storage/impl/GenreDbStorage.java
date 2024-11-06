@@ -8,11 +8,21 @@ import ru.yandex.practicum.filmorate.storage.GenreStorage;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 @Repository
 public class GenreDbStorage implements GenreStorage {
+	private static final String SQL_QUERY_GET_GENRES = "select * from genres";
+	private static final String SQL_QUERY_GET_GENRE = "select * from genres where genre_id = ?";
+	private static final String SQL_QUERY_GET_FILM_GENRE = """
+			select g.genre_id, g.name \n
+			from genre_film as gf \n
+			inner join genres as g on gf.genre_id = g.genre_id \n
+			where film_id = ?""";
+	private static final String SQL_QUERY_ADD_FILM_GENRE = """
+			insert into public.genre_film (film_id, genre_id) values (?, ?)""";
+	private static final String SQL_QUERY_DELETE_FILM_GENRE = """
+			delete from genre_film where film_id = ? and genre_id = ?""";
 	private final JdbcTemplate jdbcTemplate;
 
 	public GenreDbStorage(JdbcTemplate jdbcTemplate) {
@@ -21,8 +31,7 @@ public class GenreDbStorage implements GenreStorage {
 
 	@Override
 	public List<Genre> getGenres() {
-		String sql = "select * from genres";
-		List<Genre> genres = jdbcTemplate.query(sql, (rs, rowNum) -> makeGenre(rs));
+		List<Genre> genres = jdbcTemplate.query(SQL_QUERY_GET_GENRES, (rs, rowNum) -> makeGenre(rs));
 		if (genres.isEmpty()) {
 			return Collections.emptyList();
 		}
@@ -31,7 +40,7 @@ public class GenreDbStorage implements GenreStorage {
 
 	@Override
 	public Genre getGenreById(int genreId) {
-		SqlRowSet genreRows = jdbcTemplate.queryForRowSet("select * from genres where genre_id = ?", genreId);
+		SqlRowSet genreRows = jdbcTemplate.queryForRowSet(SQL_QUERY_GET_GENRE, genreId);
 		if (!genreRows.next()) {
 			return null;
 		}
@@ -42,11 +51,7 @@ public class GenreDbStorage implements GenreStorage {
 
 	@Override
 	public List<Genre> getFilmGenreById(int filmId) {
-		String sql = "select g.genre_id, g.name " +
-				"from genre_film as gf " +
-				"inner join genres as g on gf.genre_id = g.genre_id " +
-				"where film_id = ?";
-		List<Genre> filmGenres = jdbcTemplate.query(sql, (rs, rowNum) -> makeGenre(rs), filmId);
+		List<Genre> filmGenres = jdbcTemplate.query(SQL_QUERY_GET_FILM_GENRE, (rs, rowNum) -> makeGenre(rs), filmId);
 		if (filmGenres.isEmpty()) {
 			return Collections.emptyList();
 		}
@@ -55,9 +60,7 @@ public class GenreDbStorage implements GenreStorage {
 
 	@Override
 	public int addFilmGenre(int filmId, int genreId) {
-		String sqlQuery = "insert into public.genre_film (film_id, genre_id) " +
-				"values (?, ?)";
-		jdbcTemplate.update(sqlQuery,
+		jdbcTemplate.update(SQL_QUERY_ADD_FILM_GENRE,
 				filmId,
 				genreId);
 		return filmId;
@@ -65,8 +68,7 @@ public class GenreDbStorage implements GenreStorage {
 
 	@Override
 	public boolean deleteFilmGenre(int filmId, int genreId) {
-		String sqlQuery = "delete from genre_film where film_id = ? and genre_id = ?";
-		return jdbcTemplate.update(sqlQuery,
+		return jdbcTemplate.update(SQL_QUERY_DELETE_FILM_GENRE,
 				filmId,
 				genreId) > 0;
 	}

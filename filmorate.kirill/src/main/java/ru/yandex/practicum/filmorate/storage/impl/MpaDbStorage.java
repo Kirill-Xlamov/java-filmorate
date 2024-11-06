@@ -13,6 +13,8 @@ import java.util.List;
 
 @Repository
 public class MpaDbStorage implements MpaStorage {
+	private static final String SQL_QUERY_GET_BY_ID = "select * from mpa where mpa_id = ?";
+	private static final String SQL_QUERY_GET = "select * from mpa";
 	private final JdbcTemplate jdbcTemplate;
 
 	public MpaDbStorage(JdbcTemplate jdbcTemplate) {
@@ -21,8 +23,7 @@ public class MpaDbStorage implements MpaStorage {
 
 	@Override
 	public List<Mpa> getMpa() {
-		String sql = "select * from mpa";
-		List<Mpa> mpa = jdbcTemplate.query(sql, (rs, rowNum) -> makeMpa(rs));
+		List<Mpa> mpa = jdbcTemplate.query(SQL_QUERY_GET, (rs, rowNum) -> makeMpa(rs));
 		if (mpa.isEmpty()) {
 			return Collections.emptyList();
 		}
@@ -31,7 +32,7 @@ public class MpaDbStorage implements MpaStorage {
 
 	@Override
 	public Mpa getMpaById(int mpaId) {
-		SqlRowSet mpaRows = jdbcTemplate.queryForRowSet("select * from mpa where mpa_id = ?", mpaId);
+		SqlRowSet mpaRows = jdbcTemplate.queryForRowSet(SQL_QUERY_GET_BY_ID, mpaId);
 		if (!mpaRows.next()) {
 			return null;
 		}
